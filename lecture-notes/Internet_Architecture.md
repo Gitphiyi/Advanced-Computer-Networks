@@ -13,3 +13,8 @@ Network Layer       -> Find destination IP via routing
 Link Layer          -> Who gets to talk, Framing, Error Detection
 <br>
 Physical Layer      -> Bits are sent as signals over wifi, cellular, fiber, coaxial cables etc.
+
+## Brief History of Internet
+ARPANET != Internet. For example Xerox had Ethernet. ALOHAnet, PRNET, and SATNET all existed
+<br>
+Original Internet Paper: A Protocol for Packet Network Intercommunication

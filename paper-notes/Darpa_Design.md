@@ -1,5 +1,9 @@
 # The Design Philosophy of the DARPA Internet Protocols
 Paper Link: https://courses.cs.duke.edu/fall25/compsci514/readings/darpa.pdf 
+<br>
+Author: David Clark - Chief Protocol Architect of Internet & Dr. Yang's PHD advisor
+<br>
+Motivation of Paper: No documentation of what the DARPA protocol is as it is
 
 
 ## Goal of DARPA Internet Architecture:
