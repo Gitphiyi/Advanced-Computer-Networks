@@ -1,4 +1,6 @@
 # End-To-End System Design Argument
+## Author Saltzer, Reed and Clark
+Paper Link: https://courses.cs.duke.edu/fall25/compsci514/readings/endtoend.pdf 
 
 ## Main Point = Many functions (like error detection, encryption, delivery guarantees) can only be completely and correctly implemented at the application layer, because only the application knows what "correct" means.
 
