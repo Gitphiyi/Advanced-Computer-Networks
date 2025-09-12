@@ -1,4 +1,16 @@
 # TCP (Transmission Control Protocol)
+
+Table of Content:
+- What is TCP?
+- Key Features of TCP
+- TCP Header
+- TCP Handshake
+- TCP Data Transfer
+- TCP Teardown
+- How In-order Transmission Is Guaranteed
+- Flow Control
+- Congestion Control
+
 ## What is TCP?
 - Transport layer protocol that runs on top of IP protocol. It is designed to provide reliable, in-order, error-checked delivery of data between two hosts over an IP network
 - Built in 1974 to describe a protocol for sharing resources on a packet-switched network (layer 2 concept)
@@ -104,6 +116,24 @@ By now, the process of teardown should look very similar to the handshake and da
 
 In all these cases though, the whole point of establishing the connection is over is because the side that did not close should not waste resources retransmitting packets. This is why 2 FINS are used in this process.
 
-The process starts with the lient sending FIN to the server. The server acknowledges this FIN and sends its own FIN. The client then needs to send an ACK because the server won't know if the client accepted the server's FIN without it. This allows for a very graceful termination.
+The process starts with the client sending FIN to the server. The server acknowledges this FIN and sends its own FIN. The client then needs to send an ACK because the server won't know if the client accepted the server's FIN without it. This allows for a very graceful termination.
+
+## How is in-order transmission guaranteed?
+TCP guarantees in-order transmission through tracking the Sequence Number and Acknowledgement Number. By acknowledging the sequence number and how many bytes are received, anything out of order will not make sense. For example consider the case below
+
+Example:
+- Client sends Server packet with 1000 bytes and sequence number of 1001 
+- Server acknowledges client by sending ACK with acknowledgement number of 2001
+- Client sends Server a packet with 1000 bytes and sequence number of 2001 but the packet is dropped
+- Client sends Server another packet with 100 bytes and sequence number of 3001
+- The Server successfully receives it but sees that the sequence number is incorrect. Server still ACKS, but sends a duplicate ACK with an acknowledgement number of 2001.
+
+If packets arrive out of order (typically due to a dropped packet), the receiver continues acknowledging the last correctly received. Thus duplicate ACKs means receiver did not receive sent data. Thus, if out of order data is sent it will simply not be processed until the correctly ordered packet is sent.
+
+### Why not send huge packets so it is unnecessary to transmit sequential packets?
+The answer is that there is  a bandwidth limit or a MSS (Max Segment Size typically 1460 Bytes) for the network, so these huge packets simply cannot be sent. Instead, TCP provides a byte stream abstraction so that data on the application layer is seen as a stream of contiguous bytes and not several packets chunked together. What this means is when a client application wants to write a stream of bytes it can call a write() TCP API function. Then the TCP protocol will go ahead and break or coalesce the bytes into multiple segments to transmit. The receiver doesn't see the packets that come in, but instead, the receiver calls a read() TCP API function to read the bytes that come in as a stream of bytes.
+
+## How is reliabile transmission guaranteed?
+Through checksum TCP guarantees that the packets do not come corrupted. In the case that packets are corrupted or packets are dropped, then the sender can retransmit packets to receiver. This type of framework can cause congestion and flow issues if the retransmission are sent too often, and the methods to deal with such issues are detailed in the section Flow Control & Congestion Control.
 
 ## Issues with current TCP?
