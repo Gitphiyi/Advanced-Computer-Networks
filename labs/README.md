@@ -1,0 +1,2 @@
+# Labs
+These are the labs for CS 514. They are my implementation on how to do certain tasks like TCP congestion control and etc. They can server as helpful resources in conjunction with the fundamental network notes to understand network concepts.
