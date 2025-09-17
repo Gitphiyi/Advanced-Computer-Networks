@@ -295,7 +295,8 @@ params = [
     {"pairs": 2, "bandwidth": 10000, "delay": 22, "buffer": 55, "timeout": 2*fairTestTime+4},
     {"pairs": 2, "bandwidth": 15000, "delay": 20, "buffer": 75, "timeout": 2*fairTestTime+4}
 ]
-
+#     size = int(band*t/1000/8)
+# t = fairTestTime = covg+covg+wind+covg+covg covg = 5 and wind = 30 timeout = 60
 
 def runTestCase(i):
     param = params[i]
