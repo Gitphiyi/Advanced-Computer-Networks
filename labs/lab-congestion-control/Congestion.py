@@ -11,11 +11,11 @@ BETA = 0.6
 C = 0.4
 
 # cubic state
-last_crash = time.time() # time elapsed since last window reduction
 MSS = PayloadSize
 ssthresh = MSS * 50
 phase = ""
-W_last_max = 0
+Wmax = ssthresh
+Wmin = 0
 K = 0
 acks_received = 0
 
@@ -32,39 +32,42 @@ def updateCWND(reli, reliImpl, acked=False, timeout=False, fast=False):
     #reno_impl(reli, reliImpl, acked, timeout, fast)
     
 def cubic_impl(reli, reliImpl, acked=False, timeout=False, fast=False):
-    global W_last_max, MSS, phase, K, ssthresh, last_crash, acks_received
+    global Wmax, Wmin, MSS, phase, ssthresh
     cwnd = reli.cwnd
-    T = time.time() - last_crash
-    # Slow start
     if acked:
-        acks_received += 1
+        Wmin = cwnd
+        # Slow start
         if cwnd <= ssthresh:
             phase = "slow"
             reli.cwnd += MSS
         else:
-            phase = "cubic"
-            # Only increase cubicly after receiving multiple ACKS
-            if acks_received > 10:
-                K = (abs(W_last_max - cwnd) / C) ** (1/3)
-                new_cwnd = max(C * (T - K) ** 3 + W_last_max, cwnd+MSS)
-                reli.cwnd = min(new_cwnd, reli.rwnd)
-        print(f"ACK {phase}: cwnd={reli.cwnd}, ssthresh={ssthresh}, rwnd={reli.rwnd}, Wmax={W_last_max}, rto={reliImpl.rto}, K={K}")
+            phase = "BIC"
+            if reli.cwnd < Wmax: # Binary search probing
+                Wmid = (Wmax + Wmin) / 2
+                if reli.cwnd < Wmid:
+                    step = max((Wmid - reli.cwnd) / 2, 0.4*MSS)
+                    step = min(step, 3*MSS) # upper bound it here
+                    reli.cwnd += step
+                else:
+                    reli.cwnd += MSS
+            else:  # additive growth beyond Wmax
+                reli.cwnd += 0.1*MSS
+        print(f"ACK {phase}: cwnd={int(reli.cwnd)}, ssthresh={int(ssthresh)}, rwnd={reli.rwnd}, Wmax={Wmax}, Wmin={Wmin}")
     if fast: 
-        last_crash = time.time()
-        W_last_max = cwnd
-        ssthresh = max(cwnd * (1 - BETA), MSS)
-        reli.cwnd = max(cwnd * 0.8, MSS)
-        acks_received = 0
-        print(f"FAST RECOVERY: cwnd={reli.cwnd}, ssthresh={ssthresh}, rwnd={reli.rwnd}, Wmax={W_last_max}, rto={reliImpl.rto}") 
+        ssthresh = max(cwnd * (1 - BETA), 20*MSS)
+        Wmax = max(cwnd, 20*MSS)
+        Wmin = BETA * reli.cwnd
+        reli.cwnd = Wmin
+        print(f"FAST RECOVERY: cwnd={reli.cwnd}, ssthresh={ssthresh}, rwnd={reli.rwnd}, Wmax={Wmax}, rto={reliImpl.rto}") 
 
+    # timeout restarts to slow start
     if timeout:
-        reli.cwnd = max(MSS, cwnd * BETA)
-        ssthresh = max(MSS, cwnd * BETA)
-        K = 0
-        last_crash = time.time()
-        acks_received = 0
+        Wmax = max(cwnd, MSS * 20)
+        ssthresh = max(20*MSS, cwnd * BETA)
+        Wmin = MSS
+        reli.cwnd = MSS
         reliImpl.rto = reliImpl.rto * 2 # exponential backoff
-        print(f"TIMEOUT: cwnd={reli.cwnd}, ssthresh={ssthresh}, rwnd={reli.rwnd}, Wmax={W_last_max}, rto={reliImpl.rto}") 
+        print(f"TIMEOUT: cwnd={reli.cwnd}, ssthresh={ssthresh}, rwnd={reli.rwnd}, Wmax={Wmax}, rto={reliImpl.rto}") 
 
 def reno_impl(reli, reliImpl, acked=False, timeout=False, fast=False):
     global ssthresh, MSS
