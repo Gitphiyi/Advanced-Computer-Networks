@@ -3,16 +3,22 @@ import math
 from Util import *
 
 G = 0.1 #clock granularity
-K = 4
 MinRTO = 0.3
+MaxRTO = 5
 alpha = 0.125 # RTT smoothing
+
+BETA = 0.6
+C = 0.4
 
 # cubic state
 last_crash = time.time() # time elapsed since last window reduction
-Wmax = 0.0 # window size before last reduction
 MSS = PayloadSize
-ssthresh = float("inf")
+ssthresh = MSS * 50
 phase = ""
+W_last_max = 0
+K = 0
+acks_received = 0
+
 
 # updateCWND: Update reli.cwnd according to the congestion control algorithm.
 # 'reli' provides an interface to access class Reliable.
@@ -20,53 +26,68 @@ phase = ""
 # 'acked'=True when a segment is acked.
 # 'timeout'=True when a segment is timeout
 # 'fast'=True when more than three duplicated acks are received (fast retransmission).
-def updateCWND(reli, reliImpl, acked=False, timeout=False, fast=False):
-    global Wmax, last_crash, MSS, ssthresh, phase, K
-    
-    C = 0.4 #scaling constant
-    beta = 0.7
-    
-    curr_cwnd = reli.cwnd
-    T = (time.time() - last_crash) # time since last crash in SECONDS
-    # Receiver got data so can increase congestion window    
-    if acked:
-        # slow start
-        if curr_cwnd <= ssthresh:
-            curr_phase = "slow start"
-            curr_cwnd += MSS
 
-            reli.cwnd = min(curr_cwnd, reli.rwnd)
-            
-        #cubic growth
+def updateCWND(reli, reliImpl, acked=False, timeout=False, fast=False):
+    cubic_impl(reli, reliImpl, acked, timeout, fast)
+    #reno_impl(reli, reliImpl, acked, timeout, fast)
+    
+def cubic_impl(reli, reliImpl, acked=False, timeout=False, fast=False):
+    global W_last_max, MSS, phase, K, ssthresh, last_crash, acks_received
+    cwnd = reli.cwnd
+    T = time.time() - last_crash
+    # Slow start
+    if acked:
+        acks_received += 1
+        if cwnd <= ssthresh:
+            phase = "slow"
+            reli.cwnd += MSS
         else:
-            curr_phase = "cubic"
-            curr_cwnd += 1/curr_cwnd
-            reli.cwnd = min(curr_cwnd, reli.rwnd)
-            # if Wmax > 0:
-            #     K = ((Wmax - curr_cwnd) / C) ** (1/3)
-            #     new_cwnd = C * (T - K) ** 3 + Wmax
-            #     reli.cwnd = max(MSS, min(int(new_cwnd), reli.rwnd))
-            # else:
-            #     reli.cwnd += MSS
-            
-            
-        print(f"ACK {curr_phase}: cwnd={reli.cwnd}, ssthresh={ssthresh}, rwnd={reli.rwnd}, Wmax={Wmax}, rto={reliImpl.rto}, T={T}, K={K}") 
-                    
-    # Severe Congestion
+            phase = "cubic"
+            # Only increase cubicly after receiving multiple ACKS
+            if acks_received > 10:
+                K = (abs(W_last_max - cwnd) / C) ** (1/3)
+                new_cwnd = max(C * (T - K) ** 3 + W_last_max, cwnd+MSS)
+                reli.cwnd = min(new_cwnd, reli.rwnd)
+        print(f"ACK {phase}: cwnd={reli.cwnd}, ssthresh={ssthresh}, rwnd={reli.rwnd}, Wmax={W_last_max}, rto={reliImpl.rto}, K={K}")
+    if fast: 
+        last_crash = time.time()
+        W_last_max = cwnd
+        ssthresh = max(cwnd * (1 - BETA), MSS)
+        reli.cwnd = max(cwnd * 0.8, MSS)
+        acks_received = 0
+        print(f"FAST RECOVERY: cwnd={reli.cwnd}, ssthresh={ssthresh}, rwnd={reli.rwnd}, Wmax={W_last_max}, rto={reliImpl.rto}") 
+
     if timeout:
-        Wmax = 0
+        reli.cwnd = max(MSS, cwnd * BETA)
+        ssthresh = max(MSS, cwnd * BETA)
+        K = 0
         last_crash = time.time()
-        reliImpl.rto = min(reliImpl.rto * 2, 20.0) # exponential backoff
-        reli.cwnd = MSS # set cwnd to 1 packet
-        print(f"TIMEOUT: cwnd={reli.cwnd}, ssthresh={ssthresh}, rwnd={reli.rwnd}, Wmax={Wmax}, rto={reliImpl.rto}, T={T}, K={K}") 
-        
-    # Enter Fast recovery and reduce window. indicates a packet was lost but later packets arrived
+        acks_received = 0
+        reliImpl.rto = reliImpl.rto * 2 # exponential backoff
+        print(f"TIMEOUT: cwnd={reli.cwnd}, ssthresh={ssthresh}, rwnd={reli.rwnd}, Wmax={W_last_max}, rto={reliImpl.rto}") 
+
+def reno_impl(reli, reliImpl, acked=False, timeout=False, fast=False):
+    global ssthresh, MSS
+    prev_cwnd = reli.cwnd
+
+    if acked:
+        # Slow start
+        if prev_cwnd < ssthresh:
+            reli.cwnd = prev_cwnd + MSS
+        else:
+            # Congestion avoidance
+            ssthresh = prev_cwnd
+            reli.cwnd = prev_cwnd + ((MSS / prev_cwnd) * 0.5 * MSS)
+        print(f"ACK {phase}: cwnd={reli.cwnd}, ssthresh={ssthresh}, rwnd={reli.rwnd}, rto={reliImpl.rto}")
+
+    if timeout:
+        ssthresh = max(prev_cwnd * 0.5, MSS)
+        reli.cwnd = max(prev_cwnd * alpha, MSS)
+
     if fast:
-        Wmax = reli.cwnd
-        ssthresh = max(int(reli.cwnd * beta), 2*MSS)
-        reli.cwnd = ssthresh
-        last_crash = time.time()
-        print(f"FAST RECOVERY: cwnd={reli.cwnd}, ssthresh={ssthresh}, rwnd={reli.rwnd}, Wmax={Wmax}, rto={reliImpl.rto}, T={T}, K={K}") 
+        ssthresh = max(prev_cwnd * 0.5, MSS)
+        reli.cwnd = max(prev_cwnd * 0.8, MSS)
+        print(f"FAST RECOVERY: cwnd={reli.cwnd}, ssthresh={ssthresh}, rwnd={reli.rwnd}, rto={reliImpl.rto}") 
 
 
 # updateRTO: Run RTT estimation and update RTO.
@@ -91,4 +112,8 @@ def updateRTO(reli, reliImpl, timestamp):
 
     reliImpl.rto = reliImpl.srtt + 4 * reliImpl.rttvar # rto = avg RTT + 4 * variance of rtt
     reliImpl.rto = max(reliImpl.rto, MinRTO)
-    reliImpl.rto = min(reliImpl.rto, 10)
+    reliImpl.rto = min(reliImpl.rto, MaxRTO)
+        
+"""
+    This function is in charge of returning # of 
+"""
