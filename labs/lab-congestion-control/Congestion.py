@@ -7,7 +7,7 @@ MinRTO = 0.3
 MaxRTO = 5
 alpha = 0.125 # RTT smoothing
 
-BETA = 0.6
+BETA = 0.7
 C = 0.4
 
 # cubic state
@@ -32,7 +32,7 @@ def updateCWND(reli, reliImpl, acked=False, timeout=False, fast=False):
     #reno_impl(reli, reliImpl, acked, timeout, fast)
     
 def cubic_impl(reli, reliImpl, acked=False, timeout=False, fast=False):
-    global Wmax, Wmin, MSS, phase, ssthresh
+    global Wmax, Wmin, MSS, phase, ssthresh, acks_received
     cwnd = reli.cwnd
     if acked:
         Wmin = cwnd
@@ -45,20 +45,20 @@ def cubic_impl(reli, reliImpl, acked=False, timeout=False, fast=False):
             if reli.cwnd < Wmax: # Binary search probing
                 Wmid = (Wmax + Wmin) / 2
                 if reli.cwnd < Wmid:
-                    step = max((Wmid - reli.cwnd) / (2), MSS)
+                    step = max((Wmid - reli.cwnd), 4*MSS)
                     #step = min(step, 3*MSS) # upper bound it here
                     reli.cwnd += step
                 else:
-                    reli.cwnd += MSS * 0.05
+                    reli.cwnd += MSS * 0.1
             else:  # additive growth beyond Wmax
-                reli.cwnd += MSS *0.05
-        print(f"ACK {phase}: cwnd={int(reli.cwnd)}, ssthresh={int(ssthresh)}, rwnd={reli.rwnd}, Wmax={Wmax}, Wmin={Wmin}")
+                reli.cwnd += MSS *0.01
+        #print(f"ACK {phase}: cwnd={int(reli.cwnd)}, ssthresh={int(ssthresh)}, rwnd={reli.rwnd}, Wmax={Wmax}, Wmin={Wmin}")
     if fast: 
-        ssthresh = max(cwnd * (1 - BETA), 20*MSS)
+        ssthresh = max(cwnd * (BETA), 20*MSS)
         Wmax = max(cwnd, 20*MSS)
         Wmin = BETA * reli.cwnd
         reli.cwnd = Wmin
-        print(f"FAST RECOVERY: cwnd={reli.cwnd}, ssthresh={ssthresh}, rwnd={reli.rwnd}, Wmax={Wmax}, rto={reliImpl.rto}") 
+        #print(f"FAST RECOVERY: cwnd={reli.cwnd}, ssthresh={ssthresh}, rwnd={reli.rwnd}, Wmax={Wmax}, rto={reliImpl.rto}") 
 
     # timeout restarts to slow start
     if timeout:
@@ -67,31 +67,7 @@ def cubic_impl(reli, reliImpl, acked=False, timeout=False, fast=False):
         Wmin = MSS
         reli.cwnd = MSS
         reliImpl.rto = reliImpl.rto * 2 # exponential backoff
-        print(f"TIMEOUT: cwnd={reli.cwnd}, ssthresh={ssthresh}, rwnd={reli.rwnd}, Wmax={Wmax}, rto={reliImpl.rto}") 
-
-def reno_impl(reli, reliImpl, acked=False, timeout=False, fast=False):
-    global ssthresh, MSS
-    prev_cwnd = reli.cwnd
-
-    if acked:
-        # Slow start
-        if prev_cwnd < ssthresh:
-            reli.cwnd = prev_cwnd + MSS
-        else:
-            # Congestion avoidance
-            ssthresh = prev_cwnd
-            reli.cwnd = prev_cwnd + ((MSS / prev_cwnd) * 0.5 * MSS)
-        print(f"ACK {phase}: cwnd={reli.cwnd}, ssthresh={ssthresh}, rwnd={reli.rwnd}, rto={reliImpl.rto}")
-
-    if timeout:
-        ssthresh = max(prev_cwnd * 0.5, MSS)
-        reli.cwnd = max(prev_cwnd * alpha, MSS)
-
-    if fast:
-        ssthresh = max(prev_cwnd * 0.5, MSS)
-        reli.cwnd = max(prev_cwnd * 0.8, MSS)
-        print(f"FAST RECOVERY: cwnd={reli.cwnd}, ssthresh={ssthresh}, rwnd={reli.rwnd}, rto={reliImpl.rto}") 
-
+        #print(f"TIMEOUT: cwnd={reli.cwnd}, ssthresh={ssthresh}, rwnd={reli.rwnd}, Wmax={Wmax}, rto={reliImpl.rto}") 
 
 # updateRTO: Run RTT estimation and update RTO.
 # You can use time.time() to get current timestamp.
@@ -117,6 +93,3 @@ def updateRTO(reli, reliImpl, timestamp):
     reliImpl.rto = max(reliImpl.rto, MinRTO)
     reliImpl.rto = min(reliImpl.rto, MaxRTO)
         
-"""
-    This function is in charge of returning # of 
-"""
