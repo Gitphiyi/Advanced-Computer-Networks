@@ -45,13 +45,13 @@ def cubic_impl(reli, reliImpl, acked=False, timeout=False, fast=False):
             if reli.cwnd < Wmax: # Binary search probing
                 Wmid = (Wmax + Wmin) / 2
                 if reli.cwnd < Wmid:
-                    step = max((Wmid - reli.cwnd) / 2, 0.4*MSS)
-                    step = min(step, 3*MSS) # upper bound it here
+                    step = max((Wmid - reli.cwnd) / (2), MSS)
+                    #step = min(step, 3*MSS) # upper bound it here
                     reli.cwnd += step
                 else:
-                    reli.cwnd += MSS
+                    reli.cwnd += MSS * 0.05
             else:  # additive growth beyond Wmax
-                reli.cwnd += 0.1*MSS
+                reli.cwnd += MSS *0.05
         print(f"ACK {phase}: cwnd={int(reli.cwnd)}, ssthresh={int(ssthresh)}, rwnd={reli.rwnd}, Wmax={Wmax}, Wmin={Wmin}")
     if fast: 
         ssthresh = max(cwnd * (1 - BETA), 20*MSS)
