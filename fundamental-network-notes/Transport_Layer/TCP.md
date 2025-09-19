@@ -24,7 +24,7 @@ Table of Content:
 - Guarantees in order delivery. Imagine an online game where the player does a set of commands. These commands should go in the same order as the gamer inputs it.     
 
 ## TCP Header
-<img src="../img/tcp-header.png" alt = "tcp handshake diagram" width = "520">
+<img src="img/tcp-header.png" alt = "tcp handshake diagram" width = "520">
 
 **Source/Destination Port:** These are the ports on the source and destination machines. Reminder that the IP is already provided by the IP header, but even with the IP, the OS uses ports to multiplex different conversations on the same machine. Usually ports 0-1023 are reserved for custom TCP protocols and some OSes will not allow you use them. 1024-49151 are meant for officially registered protocols and 49152-65535 are meant for temporary connections. It is generally suggested to use ports like 5000, 8000, 8080, or 40,000+ for custom protocols.  
 <br>
@@ -64,7 +64,7 @@ This is useful for detecting duplicate, out of order packets, and missing packet
 
 
 ## TCP Handshake
-<img src="../img/tcp-handshake.jpg" alt = "tcp handshake diagram" width = "520">
+<img src="img/tcp-handshake.jpg" alt = "tcp handshake diagram" width = "520">
 
 **SeqS and SeqC are random numbers**  
 1. Client sends TCP Packet SYN<SeqC, 0> to Server
@@ -86,7 +86,7 @@ Suppose an attacker was using a spoofed IP address. When the attacker sends the 
 In addition, random sequence numbers makes it hard to establish TCP connection with spoofed client source address in the SYN packet
 
 ## TCP Data Transfer
-<img src="../img/tcp-data.png" alt = "tcp data transfer diagram" width = "520">
+<img src="img/tcp-data.png" alt = "tcp data transfer diagram" width = "520">
 
 1. Client sends Data Packet <SeqC+1, SeqS+1, LEN> to Server
 2. Server responds ACK <SeqS+1, SeqC+1+LEN>
@@ -105,7 +105,7 @@ Now suppose the server wanted to send a packet to the client as a response. The 
 Finally, the client has to acknowledge the packet sent by the server. This is the same process as step 2 of what the server did, but the client is now acknowledging the server.
 
 ## TCP Teardown
-<img src="../img/tcp-teardown.png" alt = "tcp teardown diagram" width = "520">
+<img src="img/tcp-teardown.png" alt = "tcp teardown diagram" width = "520">
 
 1. Client sends FIN<SeqC+N, SeqS+M> to server
 2. Server sends ACK/FIN<SeqS+M, SeqC+N+1> to client
