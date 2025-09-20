@@ -27,11 +27,11 @@ Table of Content:
 <img src="img/tcp-header.png" alt = "tcp handshake diagram" width = "520">
 
 **Source/Destination Port:** These are the ports on the source and destination machines. Reminder that the IP is already provided by the IP header, but even with the IP, the OS uses ports to multiplex different conversations on the same machine. Usually ports 0-1023 are reserved for custom TCP protocols and some OSes will not allow you use them. 1024-49151 are meant for officially registered protocols and 49152-65535 are meant for temporary connections. It is generally suggested to use ports like 5000, 8000, 8080, or 40,000+ for custom protocols.  
-<br>
+
 **Sequence Number:** Indicates the byte number of the first data byte in the segment relative to the start of the connection. The sequence number serves two roles.  A better description of how the sequence number is used is provided in the TCP handshake section.
 1. SYN flag = 1 then this is the initial sequence number. The sequence number is chosen randomly and from there it increments by the number of data sent. The sequence number of the actual first data byte and the acknowledged number in the corresponding ACK are then this sequence number plus 1. 
 2. SYN flag = 0 then this is the accumulated sequence number of the first data byte of this segment for the current session  
-<br>
+
 **Acknowledgement Number:** This also has two different modes. Similarly, a better explanation of the Acknowledgement Number will be given in the TCP Handshake section.
 - ACK bit = 1: The acknowledgement number is valid. Basically, it says I have received all bytes up to (Acknowledgement Number - 1), and I am expecting (Acknowledgement Number) of bytes next. For example, if the Acknowledgement Number was 501 then 500 bytes were received and expects to receive 501 bytes next time. 
 This is useful for detecting duplicate, out of order packets, and missing packets
@@ -105,7 +105,7 @@ Now suppose the server wanted to send a packet to the client as a response. The 
 Finally, the client has to acknowledge the packet sent by the server. This is the same process as step 2 of what the server did, but the client is now acknowledging the server.
 
 ## TCP Teardown
-<img src="img/tcp-teardown.png" alt = "tcp teardown diagram" width = "520">
+<img src="img/tcp-teardown.jpg" alt = "tcp teardown diagram" width = "520">
 
 1. Client sends FIN<SeqC+N, SeqS+M> to server
 2. Server sends ACK/FIN<SeqS+M, SeqC+N+1> to client
@@ -136,6 +136,8 @@ The answer is that there is  a bandwidth limit or a MSS (Max Segment Size typica
 ## How is reliabile transmission guaranteed?
 Through checksum TCP guarantees that the packets do not come corrupted. In the case that packets are corrupted or packets are dropped, then the sender can retransmit packets to receiver. This type of framework can cause congestion and flow issues if the retransmission are sent too often, and the methods to deal with such issues are detailed in the section Flow Control & Congestion Control.
 
+In addition, sequence numbers catch sequence issues: duplicates ignored, out-of-order reordered, missing seq number indicate lost packet.
+
 ## Problems with TCP?
 **Main Issue:** Congestion control and fairness. These problems will be covered in detail in the next sections. There have been many variants that attempt to solve this issue such as TCP CUBIC and ongoing research is still being done. 
 
@@ -148,3 +150,33 @@ Through checksum TCP guarantees that the packets do not come corrupted. In the c
 **Issue 5:** Middlebox Ossification. Middleboxes are devices that sit between endpoints and monitor or manipulate traffic such as firewalls, NATs, or load balancers. Ossification means “hardening,” and in networking, it refers to the fact that middleboxes often make rigid assumptions about protocol behavior.
 
 The result is that TCP cannot evolve quickly because middleboxes expect headers and options to follow a known format. For example, suppose a firewall only recognizes TCP packets that use well-known options (like those in TCP CUBIC). If say a Duke lab introduce a new TCP variant that reuses reserved bits in the TCP header, many middleboxes will not understand the new fields and may drop or block those packets. This prevents deployment of new TCP extensions in the real Internet, even if they work perfectly in the lab.
+
+## Flow Control
+A common issue in networking is determining how much data a sender can transmit to a receiver at once. If multiple senders transmit at their maximum rate, they could easily overwhelm the receiver buffer. Complicating things further, a receiver can dynamically adjust the size of its buffer during an active connection, meaning the amount of data it can accept changes over time.  Note the goal does not include maximizing throughput, but simply to guarantee that the receiver can handle the incoming data without overflow. In contrast, congestion control is concerned with preventing overload in the network itself (e.g., router queues and gateway buffers), where too many senders competing for limited capacity could cause packet loss and long delays.
+
+The solution to Flow Control is a sliding window, and the process can be described below.
+- In every TCP ACK, the receiver tells sender how big their buffer is in the Advertised Window (rwnd), denoting how much free space is left. Thus if the Advertised Window is 0 then the buffer is full and the sender should not send anything else
+- For window size $n$, sender may transmit $n$ bytes without receiving an ACK. This means that the sender can send multiple packets that have payloads adding up to at most $n$ bytes without a receiver ACK
+- After each ACK, the window slides forward. Basically when the receiver sends an ACK it confirms it received the bytes and frees up space in the buffer. This new space is reflected in the next advertised window size.
+
+**Example of Sliding Window:**
+<br>
+Suppose the receiver advertises its window was rwnd=5000 in the SYN-ACK of the TCP handshake and the sender's sequence number is at 0. Then the sender can send bytes 0-4999  without receiving another ACK. This would be denoted as the first window. 
+
+Next, the receiver sends an ACK = 3000 & rwnd=5000, saying the receiver got everything up to byte 2999. This frees up 3000 bytes in the receiver and thus the sender can now send bytes from 3000-7999. If the rwnd increased or decrease then the right bound of what byte the sender can send to changes, but because rwnd=5000 then the rightmost byte can only be up to 5000 more than 3000. In short, the left edge of the window increases as bytes are acknowledged, and the right edge also moves forward if the rwnd is above 0.
+
+
+<img src="img/flow-control.png" alt = "flow control" width = "520">
+
+- ACKed (left of orange) → Data already acknowledged by the receiver and sender can free this space
+
+- Sent (orange) → Data sent but not yet ACKed, so its still in flight. Needs to stay in sender buffer because it hasn't been ACKed and will be retransmitted depending on receiving duplicate ACK or Timeout expiry. Covered more in congestion control
+
+- To Be Sent (green) → Data allowed to be sent (within the advertised window)
+
+- Outside Window (red) → Data beyond the receiver’s advertised window (rwnd), so sender cannot send this until the receiver increases its rwnd
+
+- sock.send() (blue) → Application pushes more data into the send buffer, but that data may or may not fit in the current window
+
+
+## Congestion Control
