@@ -136,4 +136,15 @@ The answer is that there is  a bandwidth limit or a MSS (Max Segment Size typica
 ## How is reliabile transmission guaranteed?
 Through checksum TCP guarantees that the packets do not come corrupted. In the case that packets are corrupted or packets are dropped, then the sender can retransmit packets to receiver. This type of framework can cause congestion and flow issues if the retransmission are sent too often, and the methods to deal with such issues are detailed in the section Flow Control & Congestion Control.
 
-## Issues with current TCP?
+## Problems with TCP?
+**Main Issue:** Congestion control and fairness. These problems will be covered in detail in the next sections. There have been many variants that attempt to solve this issue such as TCP CUBIC and ongoing research is still being done. 
+
+**Issue 2:** The TCP handshake is too slow. This has sparked new TCP variants like TCP Fast Open or QUIC, which will be detailed later.
+
+**Issue 3:** 1 Packet loss blocks all other data. This is due to TCP's in order delivery nature. Say packet 1, 2, and 3 are supposed to be sent in order, but packet 2 is lost along the network. TCP requires that packets 2 and 3 be resent until both are ACKed or the connection is closed.
+
+**Issue 4:** TCP behaves poorly on wireless networks. This is due to the nature of packet loss over wireless networks, and if you haven't read the description of how congestion control is handled, TLDR packet loss is interpreted as congestion control. Thus, you can imagine a situation where the network is in fact not congested but because it is wireless and will drop packets at a higher frequency than suppose Ethernet, TCP will misinterpret this as high congestion in the network thus reducing the throughput of the sender. There have been TCP variants to try and solve for this such as TCP Veno, TCP Westwood, and Split TCP.
+
+**Issue 5:** Middlebox Ossification. Middleboxes are devices that sit between endpoints and monitor or manipulate traffic such as firewalls, NATs, or load balancers. Ossification means “hardening,” and in networking, it refers to the fact that middleboxes often make rigid assumptions about protocol behavior.
+
+The result is that TCP cannot evolve quickly because middleboxes expect headers and options to follow a known format. For example, suppose a firewall only recognizes TCP packets that use well-known options (like those in TCP CUBIC). If say a Duke lab introduce a new TCP variant that reuses reserved bits in the TCP header, many middleboxes will not understand the new fields and may drop or block those packets. This prevents deployment of new TCP extensions in the real Internet, even if they work perfectly in the lab.
