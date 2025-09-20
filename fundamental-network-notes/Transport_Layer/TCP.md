@@ -136,7 +136,24 @@ The answer is that there is  a bandwidth limit or a MSS (Max Segment Size typica
 ## How is reliabile transmission guaranteed?
 Through checksum TCP guarantees that the packets do not come corrupted. In the case that packets are corrupted or packets are dropped, then the sender can retransmit packets to receiver. This type of framework can cause congestion and flow issues if the retransmission are sent too often, and the methods to deal with such issues are detailed in the section Flow Control & Congestion Control.
 
-In addition, sequence numbers catch sequence issues: duplicates ignored, out-of-order reordered, missing seq number indicate lost packet.
+For in-order packet transmission, sequence numbers catch sequence issues: duplicates ignored, out-of-order reordered, missing seq number indicate lost packet. These sequence numbers are always returned on ACK by the receiver to determine that they have an up to date state of what byte the other party is supposed to send, but sometimes it takes a long time for the receiver to ACK. This can happen for a pletora of reasons like congestion in the network, packet loss, or long distance between the two endpoints. This then begs the question of how long should a sender wait for an ACK before retransmitting?
+
+**When should a sender retransmit?**
+
+<img src="img/rto-example.png" alt = "timeout example" height = "200">
+
+The solution is to have a designated time to wait for an ACK before retransmitting. Senders will keep data in the buffer until the data has been ACKed. For example if the sender sends bytes up to 8000 but receiver only ACKs bytes up to 5000 then bytes 5000-7999 still need to be in the sender buffer. The hard part to this is calculating that timeout duration. Usually, the sender measures the round trip time (RTT) or the amount of time it takes from packet being sent out to ACK being received by sender. Using the RTT value, a RTO or Retransmission Timeout can be tuned.
+
+**How RTO is calculated:**
+
+Naturally, TCP cannot set RTO = RTT as it is a single point of data.  The RTT can vary depending on the state of the network and should thus be a constantly changing value. Thus, in RFC 793 (original specification of TCP) a weighted average of RTT is used to calculate RTO. $\alpha$ is a weight suggested to be of value 0.9, and $RTT_{sample}$ is the latest measured RTT. If no RTT value is measured, then the RTO defaults to a value of 1 minute.
+$$
+\alpha \in [0,1]
+$$
+$$
+RTO \leftarrow \alpha *  RTO + (1-\alpha) * RTT_{sample}
+$$
+This is a very naive version of RTO estimation, and there has been big improvements in RTO estimation i.e. Jacobsen/Karels algorithm. These improvements and reasoning behind the improvements are highlighted in the paper "Congestion Avoidance and Control" by Jacobsen and Karels.
 
 ## Problems with TCP?
 **Main Issue:** Congestion control and fairness. These problems will be covered in detail in the next sections. There have been many variants that attempt to solve this issue such as TCP CUBIC and ongoing research is still being done. 
