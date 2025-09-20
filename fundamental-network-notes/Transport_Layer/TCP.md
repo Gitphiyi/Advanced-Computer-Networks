@@ -7,7 +7,9 @@ Table of Content:
 - TCP Handshake
 - TCP Data Transfer
 - TCP Teardown
-- How In-order Transmission Is Guaranteed
+- How In-Order Transmission is Guaranteed
+- How Reliable Transmission is Guaranteed
+- Problems with TCP
 - Flow Control
 - Congestion Control
 
@@ -133,7 +135,7 @@ If packets arrive out of order (typically due to a dropped packet), the receiver
 ### Why not send huge packets so it is unnecessary to transmit sequential packets?
 The answer is that there is  a bandwidth limit or a MSS (Max Segment Size typically 1460 Bytes) for the network, so these huge packets simply cannot be sent. Instead, TCP provides a byte stream abstraction so that data on the application layer is seen as a stream of contiguous bytes and not several packets chunked together. What this means is when a client application wants to write a stream of bytes it can call a write() TCP API function. Then the TCP protocol will go ahead and break or coalesce the bytes into multiple segments to transmit. The receiver doesn't see the packets that come in, but instead, the receiver calls a read() TCP API function to read the bytes that come in as a stream of bytes.
 
-## How is reliabile transmission guaranteed?
+## How is reliable transmission guaranteed?
 Through checksum TCP guarantees that the packets do not come corrupted. In the case that packets are corrupted or packets are dropped, then the sender can retransmit packets to receiver. This type of framework can cause congestion and flow issues if the retransmission are sent too often, and the methods to deal with such issues are detailed in the section Flow Control & Congestion Control.
 
 For in-order packet transmission, sequence numbers catch sequence issues: duplicates ignored, out-of-order reordered, missing seq number indicate lost packet. These sequence numbers are always returned on ACK by the receiver to determine that they have an up to date state of what byte the other party is supposed to send, but sometimes it takes a long time for the receiver to ACK. This can happen for a pletora of reasons like congestion in the network, packet loss, or long distance between the two endpoints. This then begs the question of how long should a sender wait for an ACK before retransmitting?
@@ -158,7 +160,7 @@ $$
 
 This is a very naive version of RTO estimation, and there has been big improvements in RTO estimation i.e. Jacobsen/Karels algorithm. These improvements and reasoning behind the improvements are highlighted in the paper "Congestion Avoidance and Control" by Jacobsen and Karels.
 
-## Problems with TCP?
+## Problems with TCP
 **Main Issue:** Congestion control and fairness. These problems will be covered in detail in the next sections. There have been many variants that attempt to solve this issue such as TCP CUBIC and ongoing research is still being done. 
 
 **Issue 2:** The TCP handshake is too slow. This has sparked new TCP variants like TCP Fast Open or QUIC, which will be detailed later.
@@ -200,3 +202,33 @@ Next, the receiver sends an ACK = 3000 & rwnd=5000, saying the receiver got ever
 
 
 ## Congestion Control
+**Congestion Definition** 
+
+First, let's define network congestion. Congestion is an even when demand for network resources (bandwidth, buffer space, etc) exceed what the network can supply, leading to packet loss, queueing delay, and reduced throughput. This can occur when the network isn't built to support the load it is experiencing like during the Super Bowl. It can also occur when capacity is not uniform. For example the connections between two hops in the network can be fiber optic or old copper cables. The two types have drastically different bandwidth capacity. Lastly, congestion can occur when multiple flows want to go through one connection.
+
+**Why Congestion is Bad**
+Congestion as stated earlier can result in packet loss due to finite router buffer, router queues build up increasing latency, wasted bandwidth with retransmissions, and low-network goodput (successful work done).
+
+<img src="img/congestion-diagram.png" alt = "congestion diagram" height = "300">
+
+As can be seen in the photo, when congestion reaches a certain point called the cliff then throughput drops to near 0 and transmission delay increases to infinity. There is another point called the knee where throughput decreases slowly and transmission delay increases quickly.
+
+Typically these events can be put into 3 phases:
+- Congestion Avoidance = left of knee
+- Congestion Control = left of cliff and right of knee
+- Congestion Collapse = after cliff
+
+### Solution 
+1. match the sender’s rate to the bottleneck capacity
+2. adapt to changing network conditions
+3. share capacity fairly among flows
+4. maximize throughput without triggering congestion collapse
+
+Solutions can typically be grouped into 3 categories: General, Reservation, & Dynamic (dynamic is what TCP uses):
+- General: Send packets indiscriminately. Many packets will be dropped and performance is unpredictable
+- Reservations: Pre-arrange bandwidth allocations for flows, requires negotiation before sending packets, must be supported by the network (inefficient and IP doesn’t support this)
+- Dynamic: Use probes to estimate level of congestion, speed up when congestion is low, and slow down when congestion is high. Has messy dynamics and requires distributed control
+
+Generally, the goal is to get to the Congestion Control phase as fast as possible via Congestion Avoidance, stay in Congestion Control for as long as possible, and prevent Congestion Collapse as much as possible. 
+
+### Congestion Avoidance
