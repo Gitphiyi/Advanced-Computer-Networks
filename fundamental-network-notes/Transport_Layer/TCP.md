@@ -147,12 +147,15 @@ The solution is to have a designated time to wait for an ACK before retransmitti
 **How RTO is calculated:**
 
 Naturally, TCP cannot set RTO = RTT as it is a single point of data.  The RTT can vary depending on the state of the network and should thus be a constantly changing value. Thus, in RFC 793 (original specification of TCP) a weighted average of RTT is used to calculate RTO. $\alpha$ is a weight suggested to be of value 0.9, and $RTT_{sample}$ is the latest measured RTT. If no RTT value is measured, then the RTO defaults to a value of 1 minute.
+
 $$
 \alpha \in [0,1]
 $$
+
 $$
 RTO \leftarrow \alpha *  RTO + (1-\alpha) * RTT_{sample}
 $$
+
 This is a very naive version of RTO estimation, and there has been big improvements in RTO estimation i.e. Jacobsen/Karels algorithm. These improvements and reasoning behind the improvements are highlighted in the paper "Congestion Avoidance and Control" by Jacobsen and Karels.
 
 ## Problems with TCP?
