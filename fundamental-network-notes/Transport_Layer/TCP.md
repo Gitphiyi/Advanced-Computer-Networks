@@ -206,16 +206,25 @@ Next, the receiver sends an ACK = 3000 & rwnd=5000, saying the receiver got ever
 
 First, let's define network congestion. Congestion is an even when demand for network resources (bandwidth, buffer space, etc) exceed what the network can supply, leading to packet loss, queueing delay, and reduced throughput. This can occur when the network isn't built to support the load it is experiencing like during the Super Bowl. It can also occur when capacity is not uniform. For example the connections between two hops in the network can be fiber optic or old copper cables. The two types have drastically different bandwidth capacity. Lastly, congestion can occur when multiple flows want to go through one connection.
 
+**How to Detect Congestion?**
+
+Usually congestion is detected when a packet is dropped (caveat is WIFI), as it is very difficult to determine congestion based on the RTT. This is because many factors affect RTT such as the path the packet took to get to the destination IP vs. if a packet is dropped then it is a clear sign that there is congestion. 
+
+A packet drop is detected after not receiving an ACK within RTO or receiving duplicate ACKs in a row. Receiving duplicate ACKs in a row means that the receiver is receiving packets from the sender, but they are out of order. For example, the receiver gets bytes up to 3000, but a packet from 3000-4000 is lost. The sender still sent packets for bytes 4000-6000 which the receiver got, but because the bytes for 3000-4000 the ACK will still ask for sequence number 3000. Therefore, this is a sign of packet loss. 
+
+It is commonly said that TCP is ACK clocked as congestion can only be determined once RTO passes or ACKs come. In addition, if there is delay between ACKs then there must be congestion, and if there are low delays between ACKs then the congestion is not bad.
+
 **Why Congestion is Bad**
+
 Congestion as stated earlier can result in packet loss due to finite router buffer, router queues build up increasing latency, wasted bandwidth with retransmissions, and low-network goodput (successful work done).
 
 <img src="img/congestion-diagram.png" alt = "congestion diagram" height = "300">
 
 As can be seen in the photo, when congestion reaches a certain point called the cliff then throughput drops to near 0 and transmission delay increases to infinity. There is another point called the knee where throughput decreases slowly and transmission delay increases quickly.
 
-Typically these events can be put into 3 phases:
+Typically these events can be put into 3 phases (*Note: these names can vary*):
 - Congestion Avoidance = left of knee
-- Congestion Control = left of cliff and right of knee
+- Capacity Control = between knee and cliff
 - Congestion Collapse = after cliff
 
 ### Solution 
@@ -229,6 +238,15 @@ Solutions can typically be grouped into 3 categories: General, Reservation, & Dy
 - Reservations: Pre-arrange bandwidth allocations for flows, requires negotiation before sending packets, must be supported by the network (inefficient and IP doesn’t support this)
 - Dynamic: Use probes to estimate level of congestion, speed up when congestion is low, and slow down when congestion is high. Has messy dynamics and requires distributed control
 
-Generally, the goal is to get to the Congestion Control phase as fast as possible via Congestion Avoidance, stay in Congestion Control for as long as possible, and prevent Congestion Collapse as much as possible. 
+Generally, the goal is to get past Congestion Avoidance quickly to a high throughput state, stay in Congestion Control for as long as possible, and prevent Congestion Collapse as much as possible. 
 
-### Congestion Avoidance
+### Congestion Avoidance & Control
+Before diving into congestion control algorithms, it is necessary to understand some background information first. congestion algorithms are entirely implemented by the sender, and sits in the TCB of the OS. Thus, the receiver can only supply inputs to the sender to use to help prevent congestion, but the receiver is obviously helpless to what the sender sends out on the network.
+
+Variables used to control congestion:
+- Congestion Window (cwnd): Sender maintained variable to limit the number of unACKED packets to be in flight. Thus even if the receiver advertises a big buffer the cwnd is a sender designated limit of number of bytes to send.
+- Receiver Advertised Window (rwnd): Max number of unACKed bytes that a sender can send
+- Slow Start Threshold (ssthresh): This will be talked about in the upcoming paragraph but this is essentially the knee or the point to switch from Congestion Avoidance to Capacity but not hit Congestion Collapse. 
+
+In general the algorithm for congestion control is modify cwnd, probe for bandwidth, respond to congestion. In other words, increase sending rate after successful ACK, decrease after lost packet.
+
