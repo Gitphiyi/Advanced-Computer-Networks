@@ -250,3 +250,27 @@ Variables used to control congestion:
 
 In general the algorithm for congestion control is modify cwnd, probe for bandwidth, respond to congestion. In other words, increase sending rate after successful ACK, decrease after lost packet.
 
+### Congestion Avoidance
+As stated above, the goal of Congestion Avoidance is to quickly reach the saturation point of a network where the throughput is the highest, while not hitting congestion collapse. Sender's want to hit the saturation point or the knee quickly because if not the sender is under utilizing the network and thus wasting network bandwidth. The de facto algorithm for Congestion Avoidance has been Slow Start, but in recen years there have been variants and new algorithms that have aimed to replace it such as Hybrid Slow Start, Quick Start, BBR, etc. Understanding Slow Start and how it works will serve as a good start to understand other algorithms.
+
+#### Slow Start
+<img src="img/slow-start.png" alt = "slow start diagram" height = "300"> <br>
+Contradictory to the name, Slow Start grows exponentially and stops once the congestion window (cwnd) reaches a ssthresh value.
+
+**Algorithm:**
+- On start, initialize cwnd = 1 * MSS, ssthresh = advertised window (rwnd)
+- On every received ACK, increment cwnd by 1
+- Continue until cwnd > ssthresh or a packet is lost
+    - On packet loss: reset ssthresh = max(cwnd / 2, 2*MSS) and cwnd = 1 * MSS
+    - Cwnd > ssthresh: switch to Congestion Control
+
+**Why Does Slow Start Grow Exponentially?** 
+
+To understand this lets describe the phenomenon that happens in the picture above. On initialization cwnd = 1 * MSS. This means that only one TCP packet can be sent as a packet can contain MSS bytes in its payload. Assuming that the sender then receives an ACK and cwnd < ssthresh, then the sender can now send cwnd+1 = 2 * MSS bytes. The key detail to note is that this cannot fit inside of 1 TCP packet. It must be split into at least 2 TCP packets. Now, suppose that both of the packets get ACKed and cwnd < ssthresh again. This means that the congestion window gets incremented twice such that cwnd + 1*2 = 4 * MSS bytes. This continues so on so forth until slow start is over. By comparing the cwnds after receiving ACKs, it increments in the sequence 1, 2, 4, 8, ..., $2^n$ where n is however many iterations it takes to finish slow start. This is clearly exponential.
+
+**Why ssthresh is initialized to Advertised Window?**
+
+This is because on initialization the rwnd is the theoretical max the cwnd can be. The goal of slow start is to reach the saturation point of the network, and thus the saturation point MUST be some value less than or equal to rwnd. The intuitive reason for why ssthresh is halved on packet loss is because packet loss means the previous sending rate was too large. The sender doesn't want to reset to rwnd because that means the sender is just going to have packet loss again, but the ssthresh shouldn't be reset to some minimum value because then that defeats the whole purpose of having ssthresh be the theoretical knee or saturation point. Instead half is chosen as a sort of binary search. By halving ssthresh, it is conservative enough to relieve congestion and aggressive enough to recover quickly. Mathematically when multiple flows halve on loss, they converge to fair sharing, but this reasoning can be abstracted unless you want to research more into it.
+
+
+### Congestion Control
