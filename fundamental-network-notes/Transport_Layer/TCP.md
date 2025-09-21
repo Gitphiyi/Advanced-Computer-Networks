@@ -173,6 +173,9 @@ This is a very naive version of RTO estimation, and there has been big improveme
 
 The result is that TCP cannot evolve quickly because middleboxes expect headers and options to follow a known format. For example, suppose a firewall only recognizes TCP packets that use well-known options (like those in TCP CUBIC). If say a Duke lab introduce a new TCP variant that reuses reserved bits in the TCP header, many middleboxes will not understand the new fields and may drop or block those packets. This prevents deployment of new TCP extensions in the real Internet, even if they work perfectly in the lab.
 
+**Issue 6:** Susceptible to DDoS. TCP connections require state as initial SYN allocates resources on the server. The state must persist for however long the RTO is, so a sendercould blast SYNs to a server to allocate all the memory which is called a SYN flood. The solution was using a SYN cookie which can be read about here: https://en.wikipedia.org/wiki/SYN_cookies.  
+
+
 ## Flow Control
 A common issue in networking is determining how much data a sender can transmit to a receiver at once. If multiple senders transmit at their maximum rate, they could easily overwhelm the receiver buffer. Complicating things further, a receiver can dynamically adjust the size of its buffer during an active connection, meaning the amount of data it can accept changes over time.  Note the goal does not include maximizing throughput, but simply to guarantee that the receiver can handle the incoming data without overflow. In contrast, congestion control is concerned with preventing overload in the network itself (e.g., router queues and gateway buffers), where too many senders competing for limited capacity could cause packet loss and long delays.
 
@@ -255,7 +258,7 @@ As stated above, the goal of Congestion Avoidance is to quickly reach the satura
 
 #### Slow Start
 <img src="img/slow-start.png" alt = "slow start diagram" height = "300"> <br>
-Contradictory to the name, Slow Start grows exponentially and stops once the congestion window (cwnd) reaches a ssthresh value.
+Contradictory to the name, Slow Start grows exponentially and stops once the congestion window (cwnd) reaches a ssthresh value. 
 
 **Algorithm:**
 - On start, initialize cwnd = 1 * MSS, ssthresh = advertised window (rwnd)
@@ -268,9 +271,35 @@ Contradictory to the name, Slow Start grows exponentially and stops once the con
 
 To understand this lets describe the phenomenon that happens in the picture above. On initialization cwnd = 1 * MSS. This means that only one TCP packet can be sent as a packet can contain MSS bytes in its payload. Assuming that the sender then receives an ACK and cwnd < ssthresh, then the sender can now send cwnd+1 = 2 * MSS bytes. The key detail to note is that this cannot fit inside of 1 TCP packet. It must be split into at least 2 TCP packets. Now, suppose that both of the packets get ACKed and cwnd < ssthresh again. This means that the congestion window gets incremented twice such that cwnd + 1*2 = 4 * MSS bytes. This continues so on so forth until slow start is over. By comparing the cwnds after receiving ACKs, it increments in the sequence 1, 2, 4, 8, ..., $2^n$ where n is however many iterations it takes to finish slow start. This is clearly exponential.
 
-**Why ssthresh is initialized to Advertised Window?**
+**How ssthresh is Determined?**
 
-This is because on initialization the rwnd is the theoretical max the cwnd can be. The goal of slow start is to reach the saturation point of the network, and thus the saturation point MUST be some value less than or equal to rwnd. The intuitive reason for why ssthresh is halved on packet loss is because packet loss means the previous sending rate was too large. The sender doesn't want to reset to rwnd because that means the sender is just going to have packet loss again, but the ssthresh shouldn't be reset to some minimum value because then that defeats the whole purpose of having ssthresh be the theoretical knee or saturation point. Instead half is chosen as a sort of binary search. By halving ssthresh, it is conservative enough to relieve congestion and aggressive enough to recover quickly. Mathematically when multiple flows halve on loss, they converge to fair sharing, but this reasoning can be abstracted unless you want to research more into it.
+This is because on initialization the rwnd is the theoretical max the cwnd can be. The goal of slow start is to reach the saturation point of the network, and thus the saturation point MUST be some value less than or equal to rwnd. The intuitive reason for why ssthresh is halved on packet loss is because packet loss means the previous sending rate was too large. The sender doesn't want to reset to rwnd because that means the sender is just going to have packet loss again, but the ssthresh shouldn't be reset to some minimum value because then that defeats the whole purpose of having ssthresh be the theoretical knee or saturation point. Instead half is chosen as it is conservative enough to relieve congestion and aggressive enough to recover quickly. Mathematically when multiple flows halve on loss, they converge to fair sharing, but this reasoning can be abstracted unless you want to research more into it.
 
+<img src="img/aimd-sawtooth.png" alt = "AIMD sawtooth" height = "300">
 
 ### Congestion Control
+Congestion control is the phase that is entered after cwnd passes ssthresh (cwnd > ssthresh). From here, the goal is to stay in congestion control for as long as possible as anything after ssthresh and before congestion collapse is considered good throughput. The algorithm described below is an Additive Increase Multiplicative Decrease (AIMD) type called TCP Reno. This typically results in a sawtooth like pattern for throughput. Also note that TCP Reno is not the current used TCP protocol. TCP Cubic is what is implemented in Linux, and there are many variations of congestion control that optimize for a particular network type. 
+
+It is important to note that TCP always forces packet drops because it is always probing for bandwidth. The general process is that while the sender want to stay in congestion control for a long time, the sender also wants to keep checking if it can get more and more bandwith.
+
+
+**Algorithm:**
+- Increment cwnd by 1 * MSS per RTT (not exponential growth but linear as it is per RTT)
+- On 3 Duplicate ACKs do Fast Recovery & on timeout return to slow start
+    - Fast Recovery: cwnd = cwnd/2; ssthresh = cwnd/2
+    - Timeout: cwnd = 1; ssthresh = cwnd / 2
+
+**What is Fast Recovery?**
+
+The reason Fast Recovery exists is because the receiver is still getting packets from the sender, so the congestion hasn't reach an extreme yet. By halving the cwnd, the sender doesn't have to restart from slow start again and can still avoid congestion collapse. Still with congestion collapse, this means congestion is extreme so cwnd is set to 1.
+
+<img src="img/congestion-full.png" alt = "Full Example of Congestion Avoidance + Control" height = "300">
+
+While it is labelled as Congestion Avoidance, the section in the red box is how fast recovery and AIMD works. At the start, ssthresh is set the rwnd, and after a timeout, ssthresh is set to half of the cwnd at the timeout. Then Congestion Control runs where it linearly increases the cwnd until duplicate ACKs where it halves. It isn't seen but the ssthresh should be halved at every fast recovery in this implementation called TCP Reno. This is to ensure that the algorithm doesn't return back to slow start and just linearly increase. After the zigzag pattern, the linear increase eventually reaches congestion collapse, and thus results in slow start being restarted again.
+
+**Issues with AIMD**
+- Slow start and AIMD are slow to converge when bandwidth or delay is large
+- Since TCP is ACK clocked, it can only react as quickly as ACK is received. Thus large RTT means TCP is slow to react
+
+### TCP Variants
+TCP Variants were thus created for said issues in TCP. These variants aim to solve problems ranging from long distance networks, fairness, efficiency, etc. The issue with variants however is that TCP variants will perform better than older senders who use old TCP protocols like TCP Reno. For example TCP Cubic would dominate the bandwidth compared to TCP Reno, but this can be countered by setting constants to be friendlier to old protocols. 
