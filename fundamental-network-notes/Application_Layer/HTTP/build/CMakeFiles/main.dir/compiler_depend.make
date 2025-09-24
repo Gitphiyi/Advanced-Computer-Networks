@@ -976,11 +976,8 @@ CMakeFiles/main.dir/main.cpp.o: /Users/philipyi/Documents/Coding-Projects/Advanc
   /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/clang/16/include/stddef.h \
   /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/clang/16/include/stdint.h \
   /Users/philipyi/Documents/Coding-Projects/Advanced-Computer-Networks/fundamental-network-notes/Application_Layer/HTTP/client.hpp \
-  /Users/philipyi/Documents/Coding-Projects/Advanced-Computer-Networks/fundamental-network-notes/Application_Layer/HTTP/general.hpp \
   /Users/philipyi/Documents/Coding-Projects/Advanced-Computer-Networks/fundamental-network-notes/Application_Layer/HTTP/server.hpp
 
-
-/Users/philipyi/Documents/Coding-Projects/Advanced-Computer-Networks/fundamental-network-notes/Application_Layer/HTTP/general.hpp:
 
 /Users/philipyi/Documents/Coding-Projects/Advanced-Computer-Networks/fundamental-network-notes/Application_Layer/HTTP/client.hpp:
 
