@@ -12,3 +12,4 @@
 
 int init_socket(const char* ip, int port);
 int connect_to_client(int socket_fd);
+void get_http_bytes(int server_fd);
