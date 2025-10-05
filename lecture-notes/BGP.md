@@ -163,9 +163,11 @@ This is the default version of iBGP where all the BGP routers connect with each 
 
 This is the better version of iBGP used for larger networks. The green circles are basically the route reflectors that act as a database storing all the learned routes to IP prefixes, and the yellow circles are the BGP routers. When a BGP router learns a new route, it sends the route only to connected route reflectors. The route reflectors then distributes it to other route reflectors and BGP routers so they can learn the new routes.
 
-### Path Vector
-- Advertisement contains entire AS path to prevent cycles
-- ASPATH Attribute
-Records what ASes a route went through. This prevents loops such that a route can be discarded if a loop is detected. There is also the shortest path heuristic which basically says if the AS path length is not long then the distance is probably short which is not true and results in issues.
+### BGP Issues
+- Route Hijacking: There is little authentication on whether an AS actually owns an IP prefix. Thus, any AS can originate a route for any prefix and cause traffic meant for somewhere else to come to the hijacking AS
+    - Example is Youtube and Pakistan incident. Youtube uses a prefix with length 24 bits, and Pakistan ordered all ISPs to block Youtube. Instead of dropping packets, Pakistani ISP's introduced a new 24 bit table entry to divert Youtube traffic to. This IP prefix was leaked to the Pakistani ISP's provider. a Hong Kong ISP called PCCW, and PCCW ended up prioritizing the Pakistani route over the actual Youtube route. Since normally there are no other 24 bit addresses that route to Youtube as they are contained in advertisements with a much wider IP range all the neighboring ISP's started choosing the new longer IP prefix.
+    - Hijackers can also use this to spoof IP's. Basically in a TCP connection hijackers need to receive the TCP ACK sent to the spoofed IP, which would normally not be the case. Now, hijackers can simply hijack the IP prefix of the spoofed IP and advertise it to ISPs. The traffic is then routed to the hijacker. The hijacker can send spam over the hijacked IP prefix and stop after basically leaving with very little trace
+
+- Convergence Issues: faults take several seconds to detect and several minutes for routes to converge after a change.
 
 ### BGP Example Work Flow
