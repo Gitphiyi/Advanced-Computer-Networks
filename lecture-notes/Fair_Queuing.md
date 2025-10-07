@@ -2,10 +2,12 @@
 Instead of FIFO there should be a fair queuing algorithm for buffer space, bandwidth, and latency amoung competing sources
 
 ## What is Fair?
+- Only applicable when network has fair queuing algorithm
 - There is no satisfactory sol
     - Could be fairness for flow
     - What if a flow uses long path?
-- Max-min fairness
+- Max-min fairness: An allocation is max–min fair when it is impossible to increase any flow’s rate without decreasing another flow that already has an equal or smaller rate
+    - Give as much as possible to each flow, but never at the expense of someone smaller
     - many fq algos aim to achieve this def of fairness
     1. No user receives more than it requests
     2. No other allocation satisfies 1 and a higher min allocation (this is the largest min share allocation)

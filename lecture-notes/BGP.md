@@ -17,6 +17,9 @@ Background:
 - 152.3.0.0/16 means the IP prefix is 16 bits long
 - Routers exchange routing protocol messages to building routing table
 - IP Prefixes and ASNs are seperately registered
+- 1GB = 1000 MB = 1,000 KB = 1,000,000,000 B
+- Gb = gigabits
+- DBP (BDP) = Bandwidth×Propagation Delay (propogation delay is RTT from A to B)
 
 ## Autonomous Systems (AS)
 Autonomous System (AS): group of IP prefixes under common management. Identifiable by a 16 bit (now its 32 bits) AS Number (ASN)
@@ -94,14 +97,6 @@ This is a inter-network communication protocol that allow ASes to send traffic t
 - NOTIFICATION: Terminate or reject a BGP connection and sometimes includes error messages
 - KEEPALIVE: Sent at 1/3 the Hold Time
     - Keep-alive timer is run such that during a BGP sesion a router will send at least 1 BGP message (UPDATE or KEEPALIVE) within the timer to keep alive. The absence of KEEPALIVE messages means the session will be terminated, and this is configurable by hold timer.
-
-### BGP State Machines
-- Idle:
-- Connect:
-- Active:
-- Open Sent:
-- Open Confirm:
-- Established:
 <br>
 
 **BGP Process (AS A & AS B)**:
@@ -169,5 +164,32 @@ This is the better version of iBGP used for larger networks. The green circles a
     - Hijackers can also use this to spoof IP's. Basically in a TCP connection hijackers need to receive the TCP ACK sent to the spoofed IP, which would normally not be the case. Now, hijackers can simply hijack the IP prefix of the spoofed IP and advertise it to ISPs. The traffic is then routed to the hijacker. The hijacker can send spam over the hijacked IP prefix and stop after basically leaving with very little trace
 
 - Convergence Issues: faults take several seconds to detect and several minutes for routes to converge after a change.
+- Scaling Issues: Multi-homing is where an AS connects to multiple providers for greater availability and distributing traffic across providers. When it is implemented routing tables get very big because every IP 
+
+### BGP Sufficient Convergence 
+
+### BGP Instability
+**Goals:** how often BGP sends updates to change routes
+<br>
+- Delayed Internet Convergence
+    - Reesearchers announced Tup (prev unannounced route is announced), Tdown (prev available route is withdrawn), Tshort(active long ASPath is implicitly replaced by shorter path), Tlong (active short ASPath replaced with long path) events and measured time for BGP to stabilize
+    - Saw bad news traveled slow. Tdown announcement took significantly longer than Tup announcement
+    - Routing convergence does impact latency and loss rate
+    - Why?
+        -
+
+
+### Valley Free Routing
+**IF VALLEY FREE ROUTING IS FOLLLOWED THEN BGP WILL CONVERGE**
+<br>
+- Customer advertises to everyone
+- Provider advertises only customer routes
+- Peer advertises only customer routes
+- Customer Routes >= Peer Routes > Provider Routes
+- After traversing a provider-to-customer or a peer-to-peer edge, a BGP path can only traverse provider-to-customer (or sibling-to-sibling = ASes under same org != peer to peer) edges
+- No Dispute Wheels: a circular set of conflict rankings between nodes
+
+#### Dispute Wheel Intuition
+
 
 ### BGP Example Work Flow
